@@ -1,0 +1,9 @@
+{
+  "author": "Thermetrics",
+  "appId": "6a4259b4199ea621d7fc31a7",
+  "version": "1.0.0",
+  "versionDescription": "Operations dashboard — open opportunities, TRIPS/IHS by year, support ticket overview",
+  "config": {
+    "fields": {}
+  }
+}
