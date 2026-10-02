@@ -1,8 +1,8 @@
 {
   "author": "Thermetrics",
   "appId": "6a4259b4199ea621d7fc31a7",
-  "version": "1.0.0",
-  "versionDescription": "Operations dashboard — open opportunities, TRIPS/IHS by year, support ticket overview",
+  "version": "1.5.0",
+  "versionDescription": "Moved calendar sync off the Trips/IHS tab (already covered on Support Dashboard) onto the Conferences tab instead: new '\ud83d\uddd3\ufe0f Sync Conferences to Calendar' button pushes each conference's actual Conference Dates range to the new \ud83c\udfaa Conference Schedule calendar, skipping Cancelled conferences.",
   "config": {
     "fields": {}
   }

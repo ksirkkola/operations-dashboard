@@ -100,27 +100,42 @@ export default function RevenuePanel({ refreshKey = 0 }: Props) {
     });
   }, [inside, refreshKey]);
 
+  // Year of Conference is a manually-set override; when it's not set, fall
+  // back to the actual Conference Dates — NOT Planning Start (that's when
+  // prep began, which can be a year+ before a far-out conference and would
+  // put e.g. a 2027 conference under 2026).
+  function confYear(r: Record<string, unknown>): string {
+    const manual = String(r.yearOfConference || '').trim();
+    if (manual) return manual;
+    return tsToYear(r.conferenceDatesStart);
+  }
+
   // Derive available years from all datasets
   const availableYears = useMemo(() => {
     const years = new Set<string>();
     oppRows.forEach(r => { const y = tsToYear(r.closedWonDate); if (y !== 'Unknown') years.add(y); });
     tripsRows.forEach(r => { const y = String(r.yearOfService || '').trim(); if (y) years.add(y); });
     stRows.forEach(r => { const y = tsToYear(r.dateReceived); if (y !== 'Unknown') years.add(y); });
-    confRows.forEach(r => { const y = String(r.yearOfConference || '').trim(); if (y) years.add(y); });
+    confRows.forEach(r => { const y = confYear(r); if (y !== 'Unknown') years.add(y); });
     return [ALL_YEARS, ...Array.from(years).sort((a, b) => b.localeCompare(a))];
-  }, [oppRows, tripsRows, stRows]);
+  }, [oppRows, tripsRows, stRows, confRows]);
 
-  // Filter conferences by selected year using yearOfConference field
+  // Filter conferences by selected year
   const filteredConf = selectedYear === ALL_YEARS
     ? confRows
-    : confRows.filter(r => String(r.yearOfConference || '').trim() === selectedYear);
+    : confRows.filter(r => confYear(r) === selectedYear);
 
-  const confRegistration   = sum(filteredConf, 'registrationCost');
-  const confHotel          = sum(filteredConf, 'hotelCost');
-  const confTravel         = sum(filteredConf, 'travelCost');
-  const confLogistics      = sum(filteredConf, 'logistics');
-  const confTransportation = sum(filteredConf, 'transportationCost');
-  const confOther          = sum(filteredConf, 'otherCost');
+  // Cancelled conferences never happened — exclude their costs from the
+  // rollup so a cancelled conference doesn't skew year-over-year expense
+  // comparisons. They still appear in the table below with their own phase
+  // badge and per-row total, just not counted in the headline figures.
+  const filteredConfForCosts = filteredConf.filter(r => r.phase !== 'Cancelled');
+  const confRegistration   = sum(filteredConfForCosts, 'registrationCost');
+  const confHotel          = sum(filteredConfForCosts, 'hotelCost');
+  const confTravel         = sum(filteredConfForCosts, 'travelCost');
+  const confLogistics      = sum(filteredConfForCosts, 'logistics');
+  const confTransportation = sum(filteredConfForCosts, 'transportationCost');
+  const confOther          = sum(filteredConfForCosts, 'otherCost');
   const confTotalExpenses  = confRegistration + confHotel + confTravel + confLogistics + confTransportation + confOther;
 
   // Filter rows by selected year
@@ -315,7 +330,7 @@ export default function RevenuePanel({ refreshKey = 0 }: Props) {
       {/* Conferences */}
       <Section title="Conferences" color="teal.600">
         <SimpleGrid columns={{ base: 2, md: 3 }} spacing={4} mb={5}>
-          <Stat><StatLabel>Total Expenses</StatLabel><StatNumber fontSize="lg" color="red.500">{fmt(confTotalExpenses)}</StatNumber><StatHelpText>{filteredConf.length} conferences</StatHelpText></Stat>
+          <Stat><StatLabel>Total Expenses</StatLabel><StatNumber fontSize="lg" color="red.500">{fmt(confTotalExpenses)}</StatNumber><StatHelpText>{filteredConf.length} conferences — excludes cancelled</StatHelpText></Stat>
         </SimpleGrid>
         <Box bg={subtleBg} borderRadius="md" p={3} mb={5} border="1px" borderColor={borderColor}>
           <Heading size="xs" mb={2} color="gray.500">Expense Breakdown</Heading>

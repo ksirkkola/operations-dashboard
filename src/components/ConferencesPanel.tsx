@@ -1,10 +1,11 @@
 import {
-  Box, SimpleGrid, Stat, StatLabel, StatNumber, StatHelpText,
+  Box, Button, Heading, SimpleGrid, Stat, StatLabel, StatNumber, StatHelpText,
   Table, Thead, Tbody, Tr, Th, Td, Spinner, Text, Badge,
-  useColorModeValue, Flex, Select,
+  useColorModeValue, Flex, Select, HStack, useToast,
 } from '@chakra-ui/react';
 import { useEffect, useState } from 'react';
 import { useApp } from '../hailer/use-app';
+import { syncConferencesToCalendar } from '../conferenceCalendarSync';
 
 const INSIGHT_CONFERENCES = '6a46119536433d11d17cebf3';
 
@@ -17,6 +18,8 @@ interface ConfRow {
   conferenceCode: string | null;
   location: string | null;
   planningStart: number | null;
+  conferenceDatesStart: number | null;
+  conferenceDatesEnd: number | null;
   yearOfConference: string | null;
   registrationCost: number | null;
   hotelCost: number | null;
@@ -57,15 +60,38 @@ const PHASE_COLOR: Record<string, string> = {
   'Follow-Up': 'orange',
   'ROI Review': 'yellow',
   'Done': 'gray',
+  'Cancelled': 'red',
 };
 
-interface Props { refreshKey?: number }
-export default function ConferencesPanel({ refreshKey = 0 }: Props) {
+const WORKFLOW_CONFERENCE_TRACKING = '6a192ecf0965f762b3ea50b9';
+const PHASE_NEW_CONFERENCE = '6a192ed10965f762b3ea50e9';
+
+interface Props { refreshKey?: number; onRefresh?: () => void }
+export default function ConferencesPanel({ refreshKey = 0, onRefresh }: Props) {
   const { hailer, inside } = useApp();
+  const toast = useToast();
   const [rows, setRows] = useState<ConfRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedYear, setSelectedYear] = useState(currentYear);
+  const [creating, setCreating] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+
+  async function handleSyncCalendar() {
+    setSyncing(true);
+    try {
+      const result = await syncConferencesToCalendar(hailer!);
+      toast({
+        title: 'Synced to Conference Schedule calendar',
+        description: `${result.created} event${result.created === 1 ? '' : 's'} created` +
+          (result.skipped.length ? ` — ${result.skipped.length} conference${result.skipped.length === 1 ? '' : 's'} skipped (missing dates)` : ''),
+        status: 'success', duration: 5000, isClosable: true,
+      });
+    } catch (err) {
+      toast({ title: 'Calendar sync failed', description: String(err), status: 'error', duration: 6000, isClosable: true });
+    }
+    setSyncing(false);
+  }
 
   const cardBg     = useColorModeValue('white', 'gray.700');
   const rowHover   = useColorModeValue('gray.50', 'gray.600');
@@ -92,32 +118,72 @@ export default function ConferencesPanel({ refreshKey = 0 }: Props) {
       });
   }, [inside, refreshKey]);
 
-  // Group by Year of Conference field (falls back to planningStart year)
+  // Group by Year of Conference field if manually set, else the actual
+  // Conference Dates (NOT Planning Start — that's when prep began, which can
+  // legitimately be a year+ before the conference itself for far-out events).
   const yearMap: Record<string, ConfRow[]> = {};
   for (const r of rows) {
-    const year = r.yearOfConference ? String(r.yearOfConference).trim() : getYear(r.planningStart);
+    const year = r.yearOfConference ? String(r.yearOfConference).trim() : getYear(r.conferenceDatesStart ?? r.planningStart);
     if (!yearMap[year]) yearMap[year] = [];
     yearMap[year].push(r);
   }
   const years = Object.keys(yearMap).sort((a, b) => b.localeCompare(a));
   const filteredRows = yearMap[selectedYear] || rows; // show all if no year matches
 
-  const totalExpensesForYear = filteredRows.reduce((sum, r) => sum + totalCost(r), 0);
+  // Cancelled conferences never happened — keep them visible in the list/phase
+  // counts (so it's clear one was planned and fell through) but exclude their
+  // costs from the year's Total Expenses so cancelled spend doesn't skew
+  // year-over-year comparisons.
+  const totalExpensesForYear = filteredRows
+    .filter(r => r.phase !== 'Cancelled')
+    .reduce((sum, r) => sum + totalCost(r), 0);
 
   const phaseCounts: Record<string, number> = {};
   for (const r of filteredRows) {
     phaseCounts[r.phase] = (phaseCounts[r.phase] || 0) + 1;
   }
 
+  async function handleNewConference() {
+    setCreating(true);
+    try {
+      const created = await hailer!.ui.activity.create(WORKFLOW_CONFERENCE_TRACKING, { phaseId: PHASE_NEW_CONFERENCE });
+      if (created) {
+        hailer!.ui.snackbar.open('Conference created.', 'OK', 3000).catch(() => {});
+        onRefresh?.();
+      }
+    } catch (err) {
+      console.error('Create conference failed:', err);
+    }
+    setCreating(false);
+  }
+
+  const header = (
+    <Flex justify="space-between" align="center" mb={6}>
+      <Heading size="sm" color="gray.500" textTransform="uppercase" letterSpacing="wide">Conferences</Heading>
+      <HStack>
+        <Button size="sm" colorScheme="purple" variant="outline" isLoading={syncing} onClick={handleSyncCalendar}>
+          🗓️ Sync Conferences to Calendar
+        </Button>
+        <Button size="sm" colorScheme="blue" isLoading={creating} onClick={handleNewConference}>
+          + Add New Conference
+        </Button>
+      </HStack>
+    </Flex>
+  );
+
   if (loading) return <Flex justify="center" align="center" h="200px"><Spinner size="xl" /></Flex>;
   if (error)   return <Text color="red.500">Error loading data: {error}</Text>;
 
   if (rows.length === 0) return (
-    <Text color="gray.500" mt={4}>No conferences found. Add conferences to the Conference Tracking workflow to see them here.</Text>
+    <Box>
+      {header}
+      <Text color="gray.500" mt={4}>No conferences found. Click "+ Add New Conference" above to add your first one.</Text>
+    </Box>
   );
 
   return (
     <Box>
+      {header}
       <SimpleGrid columns={{ base: 2, md: 4 }} spacing={4} mb={6}>
         <Box p={4} bg={cardBg} borderRadius="md" shadow="sm" border="1px" borderColor={borderColor}>
           <Stat>
@@ -130,7 +196,7 @@ export default function ConferencesPanel({ refreshKey = 0 }: Props) {
           <Stat>
             <StatLabel>Total Expenses</StatLabel>
             <StatNumber fontSize="xl" color="red.500">{fmt(totalExpensesForYear)}</StatNumber>
-            <StatHelpText>{selectedYear}</StatHelpText>
+            <StatHelpText>{selectedYear} — excludes cancelled</StatHelpText>
           </Stat>
         </Box>
         <Box p={4} bg={cardBg} borderRadius="md" shadow="sm" border="1px" borderColor={borderColor}>
@@ -185,7 +251,7 @@ export default function ConferencesPanel({ refreshKey = 0 }: Props) {
                 <Td whiteSpace="nowrap">
                   <Badge colorScheme={PHASE_COLOR[r.phase] || 'gray'}>{r.phase || '—'}</Badge>
                 </Td>
-                <Td whiteSpace="nowrap">{fmtDate(r.planningStart)}</Td>
+                <Td whiteSpace="nowrap">{fmtDate(r.conferenceDatesStart ?? r.planningStart)}</Td>
                 <Td isNumeric>{fmt(r.registrationCost)}</Td>
                 <Td isNumeric>{fmt(r.hotelCost)}</Td>
                 <Td isNumeric>{fmt(r.travelCost)}</Td>

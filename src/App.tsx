@@ -54,7 +54,7 @@ export default function App() {
       </Box>
 
       <Box px={6} pb={8}>
-        <Tabs variant="enclosed" colorScheme="blue">
+        <Tabs variant="enclosed" colorScheme="blue" isLazy>
           <TabList mb={4}>
             <Tab fontWeight="semibold">Calendar</Tab>
             <Tab fontWeight="semibold">Opportunities</Tab>
@@ -67,7 +67,7 @@ export default function App() {
           <TabPanels>
             <TabPanel px={0}><CalendarPanel refreshKey={refreshKey} /></TabPanel>
             <TabPanel px={0}><OpportunityPanel refreshKey={refreshKey} /></TabPanel>
-            <TabPanel px={0}><ConferencesPanel refreshKey={refreshKey} /></TabPanel>
+            <TabPanel px={0}><ConferencesPanel refreshKey={refreshKey} onRefresh={refresh} /></TabPanel>
             <TabPanel px={0}><TripsPanel refreshKey={refreshKey} /></TabPanel>
             <TabPanel px={0}><SupportTicketsPanel refreshKey={refreshKey} /></TabPanel>
             <TabPanel px={0}><RevenuePanel refreshKey={refreshKey} /></TabPanel>
