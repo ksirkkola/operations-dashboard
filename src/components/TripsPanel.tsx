@@ -114,11 +114,15 @@ export default function TripsPanel({ refreshKey = 0 }: Props) {
   }
   const years = Object.keys(yearMap).sort((a, b) => b.localeCompare(a));
   const filteredRows = yearMap[selectedYear] || [];
-  const revenueForYear = filteredRows.reduce((sum, r) => sum + (r.invoicedAmount || 0), 0);
-  const travelExpenses = filteredRows.reduce((sum, r) =>
+  // Money totals only count trips in Follow-Up Activities: earlier phases can still have parts and
+  // expenses added or removed, so calculating them there isn't meaningful yet. (Closed trips are
+  // not in this panel's data — they're counted on the Revenue tab.) The list below still shows every open trip.
+  const countedRows = filteredRows.filter(r => r.phase.trim() === 'Follow-Up Activities');
+  const revenueForYear = countedRows.reduce((sum, r) => sum + (Number(r.invoicedAmount) || 0), 0);
+  const travelExpenses = countedRows.reduce((sum, r) =>
     sum + (Number(r.airfare) || 0) + (Number(r.hotel) || 0) + (Number(r.meals) || 0) +
     (Number(r.transportation) || 0) + (Number(r.other) || 0), 0);
-  const partsCostForYear = filteredRows.reduce((sum, r) => {
+  const partsCostForYear = countedRows.reduce((sum, r) => {
     const parts = partsMap[r.id] || [];
     return sum + parts.reduce((ps, p) => ps + ((Number(p.supplierPrice) || 0) * (Number(p.quantityRequired) || 1)), 0);
   }, 0);
@@ -141,14 +145,14 @@ export default function TripsPanel({ refreshKey = 0 }: Props) {
           <Stat>
             <StatLabel>Revenue — {selectedYear}</StatLabel>
             <StatNumber fontSize="xl">{fmt(revenueForYear)}</StatNumber>
-            <StatHelpText>{filteredRows.length} trips</StatHelpText>
+            <StatHelpText>{countedRows.length} Follow-Up trip{countedRows.length === 1 ? '' : 's'} counted</StatHelpText>
           </Stat>
         </Box>
         <Box p={4} bg={cardBg} borderRadius="md" shadow="sm" border="1px" borderColor={borderColor}>
           <Stat>
             <StatLabel>Total Expenses</StatLabel>
             <StatNumber fontSize="xl" color="red.500">{fmt(totalExpenses)}</StatNumber>
-            <StatHelpText>Travel: {fmt(travelExpenses)} + Parts: {fmt(partsCostForYear)}</StatHelpText>
+            <StatHelpText>Travel: {fmt(travelExpenses)} + Parts: {fmt(partsCostForYear)} · Follow-Up only</StatHelpText>
           </Stat>
         </Box>
         <Box p={4} bg={cardBg} borderRadius="md" shadow="sm" border="1px" borderColor={borderColor}>

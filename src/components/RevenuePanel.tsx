@@ -279,7 +279,7 @@ export default function RevenuePanel({ refreshKey = 0 }: Props) {
       {/* TRIPS / IHS */}
       <Section title="TRIPS / IHS" color="purple.600">
         <SimpleGrid columns={{ base: 2, md: 3 }} spacing={4} mb={5}>
-          <Stat><StatLabel>Invoiced Amount</StatLabel><StatNumber fontSize="lg">{fmt(tripsInvoiced)}</StatNumber><StatHelpText>{filteredTrips.length} trips</StatHelpText></Stat>
+          <Stat><StatLabel>Invoiced Amount</StatLabel><StatNumber fontSize="lg">{fmt(tripsInvoiced)}</StatNumber><StatHelpText>{filteredTrips.length} trips in Follow-Up or Closed</StatHelpText></Stat>
           <Stat><StatLabel>PO Amount</StatLabel><StatNumber fontSize="lg">{fmt(tripsPo)}</StatNumber></Stat>
           <Stat><StatLabel>Total Expenses</StatLabel><StatNumber fontSize="lg" color="red.500">{fmt(tripsTotalExpenses)}</StatNumber></Stat>
         </SimpleGrid>
