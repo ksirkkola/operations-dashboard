@@ -1,8 +1,8 @@
 {
   "author": "Thermetrics",
   "appId": "6a4259b4199ea621d7fc31a7",
-  "version": "1.6.0",
-  "versionDescription": "Trips / IHS numbers now only count trips that are in Follow-Up Activities or Closed, since earlier phases can still have parts and expenses added or removed. Revenue tab: its trips data is limited to Follow-Up and Closed. Trips tab: still lists every open trip, but the Revenue and Total Expenses cards only count Follow-Up trips and say so.",
+  "version": "1.6.1",
+  "versionDescription": "Every activity created from this app now adds all employees (except Robert Broman, Nico Larsen and the bot) to its discussion.",
   "config": {
     "fields": {}
   }

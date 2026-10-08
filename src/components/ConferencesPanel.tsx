@@ -6,6 +6,7 @@ import {
 import { useEffect, useState } from 'react';
 import { useApp } from '../hailer/use-app';
 import { syncConferencesToCalendar } from '../conferenceCalendarSync';
+import { createActivityViaDialog } from '../hailer/employees';
 
 const INSIGHT_CONFERENCES = '6a46119536433d11d17cebf3';
 
@@ -146,7 +147,7 @@ export default function ConferencesPanel({ refreshKey = 0, onRefresh }: Props) {
   async function handleNewConference() {
     setCreating(true);
     try {
-      const created = await hailer!.ui.activity.create(WORKFLOW_CONFERENCE_TRACKING, { phaseId: PHASE_NEW_CONFERENCE });
+      const created = await createActivityViaDialog(hailer!, WORKFLOW_CONFERENCE_TRACKING, { phaseId: PHASE_NEW_CONFERENCE });
       if (created) {
         hailer!.ui.snackbar.open('Conference created.', 'OK', 3000).catch(() => {});
         onRefresh?.();
