@@ -1,8 +1,8 @@
 {
   "author": "Thermetrics",
   "appId": "6a4259b4199ea621d7fc31a7",
-  "version": "1.6.2",
-  "versionDescription": "Revenue & Expenses > TRIPS / IHS: added a Loyalty Fee column per trip and included loyalty fees in the trips Total Expenses, the per-trip Total Exp., and the grand Total Expenses / Net.",
+  "version": "1.6.3",
+  "versionDescription": "Trips / IHS tab: added a Loyalty Fee column next to Parts Cost, and loyalty fees are now included in the Total Expenses card (Travel + Loyalty + Parts), matching Revenue & Expenses.",
   "config": {
     "fields": {}
   }

@@ -8,6 +8,7 @@ import { useApp } from '../hailer/use-app';
 import { INSIGHT_TRIPS_IHS, TRIPS_PHASE_COLOR } from '../constants/ids';
 
 const INSIGHT_TRIP_PARTS = '6a7192c94af977ffe55bbc7e';
+const INSIGHT_TRIP_LOYALTY = '6acc6bb962a1233a74d00bb7'; // id + loyaltyFees per trip
 
 interface PartRow {
   id: string;
@@ -39,6 +40,7 @@ interface TripRow {
   meals: number | null;
   transportation: number | null;
   other: number | null;
+  loyaltyFees?: number | null;
 }
 
 function fmt(val: number | null): string {
@@ -74,13 +76,24 @@ export default function TripsPanel({ refreshKey = 0 }: Props) {
     Promise.all([
       hailer!.insight.data(INSIGHT_TRIPS_IHS, { update: true }),
       hailer!.insight.data(INSIGHT_TRIP_PARTS, { update: true }),
-    ]).then(([tripsData, partsData]) => {
+      // Optional: if this fails the tab still loads, just without loyalty fees.
+      hailer!.insight.data(INSIGHT_TRIP_LOYALTY, { update: true }).catch(() => null),
+    ]).then(([tripsData, partsData, loyaltyData]) => {
+      const loyaltyById = new Map<string, number>();
+      if (loyaltyData) {
+        const lh: string[] = loyaltyData.headers;
+        loyaltyData.rows.forEach((row: unknown[]) => {
+          const r: Record<string, unknown> = {};
+          lh.forEach((h, i) => { r[h] = row[i]; });
+          loyaltyById.set(r.id as string, Number(r.loyaltyFees) || 0);
+        });
+      }
       const headers: string[] = tripsData.headers;
       const parsed: TripRow[] = tripsData.rows.map((row: unknown[]) => {
         const r: Record<string, unknown> = {};
         headers.forEach((h, i) => { r[h] = row[i]; });
         return r as unknown as TripRow;
-      });
+      }).map(r => ({ ...r, loyaltyFees: loyaltyById.get(r.id) ?? 0 }));
       setRows(parsed);
 
       // Build parts map keyed by trip ID
@@ -122,11 +135,12 @@ export default function TripsPanel({ refreshKey = 0 }: Props) {
   const travelExpenses = countedRows.reduce((sum, r) =>
     sum + (Number(r.airfare) || 0) + (Number(r.hotel) || 0) + (Number(r.meals) || 0) +
     (Number(r.transportation) || 0) + (Number(r.other) || 0), 0);
+  const loyaltyForYear = countedRows.reduce((sum, r) => sum + (Number(r.loyaltyFees) || 0), 0);
   const partsCostForYear = countedRows.reduce((sum, r) => {
     const parts = partsMap[r.id] || [];
     return sum + parts.reduce((ps, p) => ps + ((Number(p.supplierPrice) || 0) * (Number(p.quantityRequired) || 1)), 0);
   }, 0);
-  const totalExpenses = travelExpenses + partsCostForYear;
+  const totalExpenses = travelExpenses + loyaltyForYear + partsCostForYear;
 
   if (loading) return <Flex justify="center" align="center" h="200px"><Spinner size="xl" /></Flex>;
   if (error) return <Text color="red.500">Error loading data: {error}</Text>;
@@ -152,7 +166,7 @@ export default function TripsPanel({ refreshKey = 0 }: Props) {
           <Stat>
             <StatLabel>Total Expenses</StatLabel>
             <StatNumber fontSize="xl" color="red.500">{fmt(totalExpenses)}</StatNumber>
-            <StatHelpText>Travel: {fmt(travelExpenses)} + Parts: {fmt(partsCostForYear)} · Follow-Up only</StatHelpText>
+            <StatHelpText>Travel: {fmt(travelExpenses)} + Loyalty: {fmt(loyaltyForYear)} + Parts: {fmt(partsCostForYear)} · Follow-Up only</StatHelpText>
           </Stat>
         </Box>
         <Box p={4} bg={cardBg} borderRadius="md" shadow="sm" border="1px" borderColor={borderColor}>
@@ -193,6 +207,7 @@ export default function TripsPanel({ refreshKey = 0 }: Props) {
                 <Th>Assigned Engineer</Th>
                 <Th>Arrival Date</Th>
                 <Th isNumeric>Invoiced Amount</Th>
+                <Th isNumeric>Loyalty Fee</Th>
                 <Th isNumeric>Parts Cost</Th>
               </Tr>
             </Thead>
@@ -228,13 +243,16 @@ export default function TripsPanel({ refreshKey = 0 }: Props) {
                       </Td>
                       <Td whiteSpace="nowrap" onClick={() => hailer!.ui.activity.open(r.id)}>{fmtDate(r.arrivalDate)}</Td>
                       <Td isNumeric onClick={() => hailer!.ui.activity.open(r.id)}>{fmt(r.invoicedAmount)}</Td>
+                      <Td isNumeric color={Number(r.loyaltyFees) > 0 ? 'red.500' : 'gray.400'} onClick={() => hailer!.ui.activity.open(r.id)}>
+                        {Number(r.loyaltyFees) > 0 ? fmt(Number(r.loyaltyFees)) : '—'}
+                      </Td>
                       <Td isNumeric color={partsCost > 0 ? 'red.500' : 'gray.400'} fontWeight={partsCost > 0 ? 'bold' : 'normal'}>
                         {partsCost > 0 ? fmt(partsCost) : parts.length > 0 ? `${parts.length} parts` : '—'}
                       </Td>
                     </Tr>
                     {isExpanded && parts.length > 0 && (
                       <Tr key={`${r.id}-parts`} bg={useColorModeValue('blue.50', 'blue.900')}>
-                        <Td colSpan={9} px={4} py={2}>
+                        <Td colSpan={10} px={4} py={2}>
                           <Table size="xs" variant="simple">
                             <Thead>
                               <Tr>
