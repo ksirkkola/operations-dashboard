@@ -11,6 +11,7 @@ const INSIGHT_TRIPS      = '6a435befd83297a6bc168f26';
 const INSIGHT_ST         = '6a435bf3885354b60a29e8f3';
 const INSIGHT_CONF       = '6a450a9facc7c3a9a80cf7c9';
 const INSIGHT_TRIP_PARTS = '6a71c2ab4af977ffe55cf4bd';
+const INSIGHT_TRIP_LOYALTY = '6acc6bb962a1233a74d00bb7'; // id + loyaltyFees per trip
 
 const ALL_YEARS = 'All Years';
 const currentYear = new Date().getFullYear().toString();
@@ -87,9 +88,13 @@ export default function RevenuePanel({ refreshKey = 0 }: Props) {
       hailer!.insight.data(INSIGHT_ST, { update: true }),
       hailer!.insight.data(INSIGHT_CONF, { update: true }),
       hailer!.insight.data(INSIGHT_TRIP_PARTS, { update: true }),
-    ]).then(([opp, trips, st, conf, tripParts]) => {
+      // Optional: if this fails the tab still loads, just without loyalty fees.
+      hailer!.insight.data(INSIGHT_TRIP_LOYALTY, { update: true }).catch(() => null),
+    ]).then(([opp, trips, st, conf, tripParts, loyalty]) => {
       setOppRows(parseInsight(opp));
-      setTripsRows(parseInsight(trips));
+      const loyaltyById = new Map<string, number>();
+      if (loyalty) parseInsight(loyalty).forEach(r => loyaltyById.set(r.id as string, Number(r.loyaltyFees) || 0));
+      setTripsRows(parseInsight(trips).map(r => ({ ...r, loyaltyFees: loyaltyById.get(r.id as string) ?? 0 })));
       setStRows(parseInsight(st));
       setConfRows(parseInsight(conf));
       setTripPartsRows(parseInsight(tripParts));
@@ -175,6 +180,7 @@ export default function RevenuePanel({ refreshKey = 0 }: Props) {
   const tripsMeals         = sum(filteredTrips, 'meals');
   const tripsTransport     = sum(filteredTrips, 'transportation');
   const tripsOther         = sum(filteredTrips, 'other');
+  const tripsLoyalty       = sum(filteredTrips, 'loyaltyFees');
   const tripsTravelExpenses = tripsAirfare + tripsHotel + tripsMeals + tripsTransport + tripsOther;
 
   // Trip parts costs — filter by year using filteredTrips IDs
@@ -182,7 +188,7 @@ export default function RevenuePanel({ refreshKey = 0 }: Props) {
   const tripsPartsCost = tripPartsRows
     .filter(r => filteredTripIds.has(r.trip as string))
     .reduce((s, r) => s + ((Number(r.supplierPrice) || 0) * (Number(r.quantityRequired) || 1)), 0);
-  const tripsTotalExpenses = tripsTravelExpenses + tripsPartsCost;
+  const tripsTotalExpenses = tripsTravelExpenses + tripsLoyalty + tripsPartsCost;
 
   // Support Ticket numbers
   const stPo     = sum(filteredSt, 'poAmount');
@@ -296,6 +302,7 @@ export default function RevenuePanel({ refreshKey = 0 }: Props) {
                 <Th isNumeric>Meals</Th>
                 <Th isNumeric>Transport</Th>
                 <Th isNumeric>Other</Th>
+                <Th isNumeric>Loyalty Fee</Th>
                 <Th isNumeric>Parts</Th>
                 <Th isNumeric>Total Exp.</Th>
               </Tr>
@@ -304,7 +311,7 @@ export default function RevenuePanel({ refreshKey = 0 }: Props) {
               {filteredTrips.map(r => {
                 const tripParts = tripPartsRows.filter(p => p.trip === r.id);
                 const partsCost = tripParts.reduce((s, p) => s + ((Number(p.supplierPrice) || 0) * (Number(p.quantityRequired) || 1)), 0);
-                const tripExpenses = (Number(r.airfare) || 0) + (Number(r.hotel) || 0) + (Number(r.meals) || 0) + (Number(r.transportation) || 0) + (Number(r.other) || 0) + partsCost;
+                const tripExpenses = (Number(r.airfare) || 0) + (Number(r.hotel) || 0) + (Number(r.meals) || 0) + (Number(r.transportation) || 0) + (Number(r.other) || 0) + (Number(r.loyaltyFees) || 0) + partsCost;
                 return (
                   <Tr key={r.id as string} _hover={{ bg: rowHover }} cursor="pointer"
                     onClick={() => hailer!.ui.activity.open(r.id as string)}>
@@ -317,6 +324,7 @@ export default function RevenuePanel({ refreshKey = 0 }: Props) {
                     <Td isNumeric color="red.500">{fmt(r.meals)}</Td>
                     <Td isNumeric color="red.500">{fmt(r.transportation)}</Td>
                     <Td isNumeric color="red.500">{fmt(r.other)}</Td>
+                    <Td isNumeric color="red.500">{Number(r.loyaltyFees) > 0 ? fmt(r.loyaltyFees) : '—'}</Td>
                     <Td isNumeric color="red.500">{partsCost > 0 ? fmt(partsCost) : '—'}</Td>
                     <Td isNumeric color="red.500" fontWeight="bold">{tripExpenses > 0 ? fmt(tripExpenses) : '—'}</Td>
                   </Tr>

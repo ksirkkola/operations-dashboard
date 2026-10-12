@@ -1,8 +1,8 @@
 {
   "author": "Thermetrics",
   "appId": "6a4259b4199ea621d7fc31a7",
-  "version": "1.6.1",
-  "versionDescription": "Every activity created from this app now adds all employees (except Robert Broman, Nico Larsen and the bot) to its discussion.",
+  "version": "1.6.2",
+  "versionDescription": "Revenue & Expenses > TRIPS / IHS: added a Loyalty Fee column per trip and included loyalty fees in the trips Total Expenses, the per-trip Total Exp., and the grand Total Expenses / Net.",
   "config": {
     "fields": {}
   }
